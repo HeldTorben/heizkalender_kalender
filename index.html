@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heizkalender</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, sans-serif; background: #f8f9fa; color: #202124; display: flex; height: 100vh; overflow: hidden; }
+
+/* Sidebar */
+.sidebar { width: 220px; min-width: 220px; background: white; border-right: 1px solid #dadce0; display: flex; flex-direction: column; overflow: hidden; }
+.sidebar-header { padding: 16px 12px 8px; border-bottom: 1px solid #dadce0; }
+.sidebar-header h2 { font-size: 14px; font-weight: 600; color: #3c4043; margin-bottom: 10px; }
+.add-room-btn { width: 100%; background: none; border: 1px dashed #dadce0; border-radius: 6px; padding: 8px; cursor: pointer; font-size: 13px; color: #1a73e8; display: flex; align-items: center; gap: 6px; }
+.add-room-btn:hover { background: #e8f0fe; border-color: #1a73e8; }
+.room-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+.room-item { padding: 10px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 0 20px 20px 0; margin-right: 8px; font-size: 13px; color: #3c4043; position: relative; }
+.room-item:hover { background: #f1f3f4; }
+.room-item.active { background: #e8f0fe; color: #1a73e8; font-weight: 500; }
+.room-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.room-delete { position: absolute; right: 8px; background: none; border: none; cursor: pointer; color: #70757a; font-size: 16px; opacity: 0; padding: 2px 4px; }
+.room-item:hover .room-delete { opacity: 1; }
+
+/* Main */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.header { background: white; padding: 10px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #dadce0; flex-shrink: 0; }
+.today-btn { background: none; border: 1px solid #dadce0; border-radius: 4px; padding: 6px 14px; cursor: pointer; font-size: 13px; color: #3c4043; }
+.today-btn:hover { background: #f1f3f4; }
+.nav-btn { background: none; border: 1px solid #dadce0; border-radius: 4px; padding: 6px 10px; cursor: pointer; font-size: 14px; color: #3c4043; }
+.nav-btn:hover { background: #f1f3f4; }
+.week-label { font-size: 16px; color: #3c4043; min-width: 160px; }
+.room-badge { background: #e8f0fe; color: #1a73e8; border-radius: 12px; padding: 4px 12px; font-size: 13px; font-weight: 500; }
+.new-btn { background: white; border: 1px solid #dadce0; border-radius: 20px; padding: 8px 16px; cursor: pointer; font-size: 13px; color: #3c4043; display: flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-left: auto; }
+.new-btn:hover { background: #f1f3f4; }
+.new-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Calendar */
+.calendar-wrap { flex: 1; overflow-y: auto; }
+.calendar { display: grid; grid-template-columns: 52px repeat(7, 1fr); background: white; }
+.time-col { border-right: 1px solid #dadce0; }
+.day-header { text-align: center; padding: 6px 2px; border-bottom: 1px solid #dadce0; border-right: 1px solid #dadce0; position: sticky; top: 0; background: white; z-index: 50; }
+.day-header .day-name { font-size: 10px; color: #70757a; text-transform: uppercase; }
+.day-header .day-num { font-size: 22px; color: #3c4043; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin: 2px auto; }
+.day-header .day-num.today { background: #1a73e8; color: white; }
+.time-header { height: 40px; border-bottom: 1px solid #dadce0; }
+.time-label { font-size: 9px; color: #70757a; text-align: right; padding-right: 6px; padding-top: 3px; height: 44px; border-bottom: 1px solid #f1f3f4; }
+.time-label.hour { border-bottom: 1px solid #dadce0; }
+.day-col { border-right: 1px solid #dadce0; position: relative; }
+.hour-line { height: 44px; border-bottom: 1px solid #f1f3f4; cursor: pointer; }
+.hour-line:hover { background: #f8f9fa; }
+.hour-line.major { border-bottom: 1px solid #dadce0; }
+.event { position: absolute; left: 2px; right: 2px; border-radius: 4px; padding: 2px 5px; font-size: 11px; cursor: pointer; z-index: 10; overflow: hidden; }
+.event .event-title { font-weight: 500; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.event .event-time { font-size: 10px; opacity: 0.9; }
+.event .delete-btn { position: absolute; top: 2px; right: 3px; background: none; border: none; color: white; cursor: pointer; font-size: 13px; opacity: 0; line-height: 1; }
+.event:hover .delete-btn { opacity: 1; }
+.current-time { position: absolute; left: 0; right: 0; height: 2px; background: #ea4335; z-index: 20; pointer-events: none; }
+.current-time::before { content: ''; width: 8px; height: 8px; background: #ea4335; border-radius: 50%; position: absolute; left: -4px; top: -3px; }
+.no-room { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #70757a; gap: 12px; }
+.no-room p { font-size: 15px; }
+
+/* Modals */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; align-items: center; justify-content: center; }
+.modal-overlay.active { display: flex; }
+.modal { background: white; border-radius: 8px; padding: 24px; width: 380px; box-shadow: 0 8px 28px rgba(0,0,0,0.2); }
+.modal h2 { font-size: 17px; font-weight: 500; margin-bottom: 18px; color: #202124; }
+.form-row { margin-bottom: 14px; }
+.form-row label { display: block; font-size: 11px; color: #5f6368; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.form-row input { width: 100%; border: 1px solid #dadce0; border-radius: 4px; padding: 8px 10px; font-size: 14px; outline: none; }
+.form-row input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.15); }
+.form-hint { font-size: 11px; color: #5f6368; margin-top: 3px; }
+.time-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modal-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.btn-cancel { background: none; border: none; padding: 8px 14px; cursor: pointer; color: #1a73e8; font-size: 13px; border-radius: 4px; }
+.btn-cancel:hover { background: #e8f0fe; }
+.btn-save { background: #1a73e8; color: white; border: none; padding: 8px 18px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.btn-save:hover { background: #1557b0; }
+.resource-tag { display: inline-block; background: #e8f0fe; color: #1a73e8; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-family: monospace; margin-top: 4px; }
+.error-msg { color: #d93025; font-size: 12px; margin-top: 6px; display: none; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h2>Raume</h2>
+    <button class="add-room-btn" onclick="openRoomModal()">
+      <span style="font-size:16px">+</span> Raum hinzufugen
+    </button>
+  </div>
+  <div class="room-list" id="roomList"></div>
+</div>
+
+<div class="main">
+  <div class="header">
+    <button class="today-btn" onclick="goToday()">Heute</button>
+    <button class="nav-btn" onclick="prevWeek()">&#8249;</button>
+    <button class="nav-btn" onclick="nextWeek()">&#8250;</button>
+    <span class="week-label" id="weekLabel"></span>
+    <span class="room-badge" id="roomBadge" style="display:none"></span>
+    <button class="new-btn" id="newEventBtn" onclick="openEventModal()" disabled>
+      <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm6 12H6v-1c0-2 4-3.1 6-3.1s6 1.1 6 3.1v1z"/></svg>
+      Neuer Termin
+    </button>
+  </div>
+  <div class="calendar-wrap" id="calendarWrap">
+    <div class="no-room" id="noRoom">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="#dadce0"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>
+      <p>Keinen Raum ausgewahlt</p>
+      <p style="font-size:13px">Raum in der Seitenleiste anlegen oder auswahlen</p>
+    </div>
+    <div class="calendar" id="calendar" style="display:none"></div>
+  </div>
+</div>
+
+<!-- Event Modal -->
+<div class="modal-overlay" id="eventModal">
+  <div class="modal">
+    <h2>Neuer Termin</h2>
+    <div class="form-row">
+      <label>Raum</label>
+      <div id="eventRoomDisplay"></div>
+    </div>
+    <div class="form-row">
+      <label>Datum</label>
+      <input type="date" id="eventDate">
+    </div>
+    <div class="time-row">
+      <div class="form-row">
+        <label>Von</label>
+        <input type="time" id="eventStart" value="18:00">
+      </div>
+      <div class="form-row">
+        <label>Bis</label>
+        <input type="time" id="eventEnd" value="21:00">
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Temperatur (optional)</label>
+      <input type="text" id="eventDesc" placeholder="z.B. #19 Grad#">
+      <div class="form-hint">Leer = Standard. Format: #19 Grad#</div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeEventModal()">Abbrechen</button>
+      <button class="btn-save" onclick="saveEvent()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Room Modal -->
+<div class="modal-overlay" id="roomModal">
+  <div class="modal">
+    <h2>Neuen Raum anlegen</h2>
+    <div class="form-row">
+      <label>Raumname</label>
+      <input type="text" id="roomName" placeholder="z.B. Wohnzimmer">
+    </div>
+    <div class="form-row">
+      <label>Ressourcenname (fur CCU)</label>
+      <input type="text" id="roomResource" placeholder="z.B. Wohnzimmer">
+      <div class="form-hint">Nur Buchstaben, Zahlen und Unterstriche. Wird als #Ressourcenname im Kalender verwendet.</div>
+      <div class="error-msg" id="roomError"></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeRoomModal()">Abbrechen</button>
+      <button class="btn-save" onclick="saveRoom()">Anlegen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = ['#1a73e8','#0b8043','#e67c00','#8430ce','#d93025','#0097a7','#f6bf26','#33b679'];
+
+let rooms = [];
+let activeRoom = null;
+let events = [];
+let currentWeekStart = getMonday(new Date());
+
+// ===== Week helpers =====
+function getMonday(d) {
+  d = new Date(d);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff); d.setHours(0,0,0,0);
+  return d;
+}
+function formatMonth(d) { return d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }); }
+function isSameDay(a, b) {
+  return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+}
+function goToday() { currentWeekStart = getMonday(new Date()); renderCalendar(); }
+function prevWeek() { currentWeekStart.setDate(currentWeekStart.getDate()-7); renderCalendar(); }
+function nextWeek() { currentWeekStart.setDate(currentWeekStart.getDate()+7); renderCalendar(); }
+
+// ===== Sidebar =====
+function renderSidebar() {
+  const list = document.getElementById('roomList');
+  list.innerHTML = '';
+  rooms.forEach((room, i) => {
+    const div = document.createElement('div');
+    div.className = 'room-item' + (activeRoom && activeRoom.resource === room.resource ? ' active' : '');
+    div.innerHTML = `
+      <div class="room-dot" style="background:${COLORS[i % COLORS.length]}"></div>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${room.name}</span>
+      <button class="room-delete" onclick="deleteRoom(event,'${room.resource}')">×</button>
+    `;
+    div.onclick = (e) => { if (!e.target.classList.contains('room-delete')) selectRoom(room); };
+    list.appendChild(div);
+  });
+}
+
+function selectRoom(room) {
+  activeRoom = room;
+  document.getElementById('roomBadge').textContent = '#' + room.resource;
+  document.getElementById('roomBadge').style.display = '';
+  document.getElementById('newEventBtn').disabled = false;
+  document.getElementById('noRoom').style.display = 'none';
+  document.getElementById('calendar').style.display = 'grid';
+  renderSidebar();
+  renderCalendar();
+}
+
+async function deleteRoom(e, resource) {
+  e.stopPropagation();
+  if (!confirm('Raum loschen?')) return;
+  await fetch('/rooms/' + resource, { method: 'DELETE' });
+  rooms = rooms.filter(r => r.resource !== resource);
+  if (activeRoom && activeRoom.resource === resource) {
+    activeRoom = null;
+    document.getElementById('roomBadge').style.display = 'none';
+    document.getElementById('newEventBtn').disabled = true;
+    document.getElementById('noRoom').style.display = 'flex';
+    document.getElementById('calendar').style.display = 'none';
+  }
+  renderSidebar();
+}
+
+// ===== Room Modal =====
+function openRoomModal() {
+  document.getElementById('roomName').value = '';
+  document.getElementById('roomResource').value = '';
+  document.getElementById('roomError').style.display = 'none';
+  document.getElementById('roomModal').classList.add('active');
+  setTimeout(() => document.getElementById('roomName').focus(), 100);
+}
+function closeRoomModal() { document.getElementById('roomModal').classList.remove('active'); }
+
+document.getElementById('roomName').addEventListener('input', function() {
+  const res = this.value
+    .replace(/ae/g,'ae').replace(/oe/g,'oe').replace(/ue/g,'ue')
+    .replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+  document.getElementById('roomResource').value = res;
+});
+
+async function saveRoom() {
+  const name = document.getElementById('roomName').value.trim();
+  const resource = document.getElementById('roomResource').value.trim();
+  const errEl = document.getElementById('roomError');
+  if (!name || !resource) { errEl.textContent = 'Name und Ressourcenname erforderlich'; errEl.style.display = 'block'; return; }
+  if (!/^[a-zA-Z0-9_]+$/.test(resource)) { errEl.textContent = 'Nur Buchstaben, Zahlen und Unterstriche erlaubt'; errEl.style.display = 'block'; return; }
+  const res = await fetch('/rooms', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, resource })
+  });
+  const data = await res.json();
+  if (data.error) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+  rooms.push({ name, resource });
+  closeRoomModal();
+  renderSidebar();
+  selectRoom({ name, resource });
+}
+
+// ===== Event Modal =====
+function openEventModal(date, hour) {
+  if (!activeRoom) return;
+  const today = date || new Date();
+  document.getElementById('eventDate').value = today.toISOString().split('T')[0];
+  if (hour !== undefined) {
+    document.getElementById('eventStart').value = String(hour).padStart(2,'0') + ':00';
+    document.getElementById('eventEnd').value = String(Math.min(hour+2,23)).padStart(2,'0') + ':00';
+  }
+  document.getElementById('eventRoomDisplay').innerHTML =
+    `<span class="resource-tag">#${activeRoom.resource}</span> <span style="font-size:13px;color:#5f6368">${activeRoom.name}</span>`;
+  document.getElementById('eventDesc').value = '';
+  document.getElementById('eventModal').classList.add('active');
+}
+function closeEventModal() { document.getElementById('eventModal').classList.remove('active'); }
+
+async function saveEvent() {
+  const date = document.getElementById('eventDate').value;
+  const start = document.getElementById('eventStart').value;
+  const end = document.getElementById('eventEnd').value;
+  const desc = document.getElementById('eventDesc').value;
+  await fetch('/events', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: '#' + activeRoom.resource,
+      start: date + 'T' + start + ':00',
+      end: date + 'T' + end + ':00',
+      description: desc
+    })
+  });
+  closeEventModal();
+  await loadEvents();
+  renderCalendar();
+}
+
+async function deleteEvent(id, e) {
+  e.stopPropagation();
+  if (!confirm('Termin loschen?')) return;
+  await fetch('/events/' + id, { method: 'DELETE' });
+  await loadEvents();
+  renderCalendar();
+}
+
+// ===== Calendar =====
+async function loadEvents() {
+  const res = await fetch('/events');
+  events = await res.json();
+}
+
+function renderCalendar() {
+  const cal = document.getElementById('calendar');
+  const today = new Date();
+  const days = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+  document.getElementById('weekLabel').textContent = formatMonth(currentWeekStart);
+
+  const roomResource = activeRoom ? '#' + activeRoom.resource : null;
+  const roomIdx = activeRoom ? rooms.findIndex(r => r.resource === activeRoom.resource) : 0;
+  const roomColor = COLORS[Math.max(roomIdx,0) % COLORS.length];
+
+  let html = '<div class="time-col"><div class="time-header"></div>';
+  for (let h = 0; h < 24; h++) {
+    html += `<div class="time-label ${h>0?'hour':''}">${h>0?h+':00':''}</div>`;
+  }
+  html += '</div>';
+
+  for (let d = 0; d < 7; d++) {
+    const day = new Date(currentWeekStart);
+    day.setDate(day.getDate() + d);
+    const isToday = isSameDay(day, today);
+    const dateStr = day.toISOString().split('T')[0];
+
+    html += `<div class="day-col">`;
+    html += `<div class="day-header">
+      <div class="day-name">${days[d]}</div>
+      <div class="day-num ${isToday?'today':''}">${day.getDate()}</div>
+    </div><div style="position:relative">`;
+
+    if (isToday) {
+      const now = new Date();
+      const topPx = (now.getHours()*60+now.getMinutes())/60*44;
+      html += `<div class="current-time" style="top:${topPx}px"></div>`;
+    }
+
+    for (let h = 0; h < 24; h++) {
+      html += `<div class="hour-line ${h>0?'major':''}" onclick="openEventModal(new Date('${dateStr}'),${h})"></div>`;
+    }
+
+    if (roomResource) {
+      const dayEvents = events.filter(ev => ev.title === roomResource && isSameDay(new Date(ev.start), day));
+      dayEvents.forEach(ev => {
+        const start = new Date(ev.start);
+        const end = new Date(ev.end);
+        const topPx = (start.getHours()*60+start.getMinutes())/60*44;
+        const heightPx = ((end-start)/60000/60)*44;
+        const startStr = start.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+        const endStr = end.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+        html += `<div class="event" style="top:${topPx}px;height:${Math.max(heightPx,18)}px;background:${roomColor};color:white">
+          <button class="delete-btn" onclick="deleteEvent('${ev.id}',event)">×</button>
+          <div class="event-title">${activeRoom.name}</div>
+          <div class="event-time">${startStr} – ${endStr}</div>
+        </div>`;
+      });
+    }
+    html += `</div></div>`;
+  }
+  cal.innerHTML = html;
+  document.querySelector('.calendar-wrap').scrollTop = 8*44+40;
+}
+
+// ===== Init =====
+async function init() {
+  const res = await fetch('/rooms');
+  rooms = await res.json();
+  await loadEvents();
+  renderSidebar();
+  renderCalendar();
+  if (rooms.length > 0) selectRoom(rooms[0]);
+}
+
+init();
+</script>
+</body>
+</html>
