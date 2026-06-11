@@ -21,7 +21,8 @@ def load_cal():
 
 def save_cal(cal):
     with open(ICS_PATH, "wb") as f:
-        f.write(cal.to_ical())
+        content = cal.to_ical().replace(b'\r\n', b'\n')
+        f.write(content)
 
 # ===== Räume =====
 def load_rooms():
