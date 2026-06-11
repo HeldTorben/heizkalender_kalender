@@ -137,6 +137,10 @@ body { font-family: Arial, sans-serif; background: #f8f9fa; color: #202124; disp
       </div>
     </div>
     <div class="form-row">
+      <label>Bezeichnung (optional)</label>
+      <input type="text" id="eventName" placeholder="z.B. Yoga, Vereinstreffen">
+    </div>
+    <div class="form-row">
       <label>Temperatur (optional)</label>
       <input type="text" id="eventDesc" placeholder="z.B. #19 Grad#">
       <div class="form-hint">Leer = Standard. Format: #19 Grad#</div>
@@ -286,13 +290,19 @@ function openEventModal(date, hour) {
   document.getElementById('eventDesc').value = '';
   document.getElementById('eventModal').classList.add('active');
 }
-function closeEventModal() { document.getElementById('eventModal').classList.remove('active'); }
+function closeEventModal() {
+  document.getElementById('eventModal').classList.remove('active');
+  document.getElementById('eventDesc').value = '';
+  document.getElementById('eventName').value = '';
+}
 
 async function saveEvent() {
   const date = document.getElementById('eventDate').value;
   const start = document.getElementById('eventStart').value;
   const end = document.getElementById('eventEnd').value;
   const desc = document.getElementById('eventDesc').value;
+  const name = document.getElementById('eventName').value.trim();
+  const fullDesc = name ? (desc ? name + ' ' + desc : name) : desc;
   await fetch('/events', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -300,7 +310,7 @@ async function saveEvent() {
       title: activeRoom.resource,
       start: date + 'T' + start + ':00',
       end: date + 'T' + end + ':00',
-      description: desc
+      description: fullDesc
     })
   });
   closeEventModal();
@@ -369,9 +379,11 @@ function renderCalendar() {
         const heightPx = ((end-start)/60000/60)*44;
         const startStr = start.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
         const endStr = end.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+        const desc = ev.description || '';
+        const displayName = desc && !desc.startsWith('#') ? desc.split('#')[0].trim() || activeRoom.name : activeRoom.name;
         html += `<div class="event" style="top:${topPx}px;height:${Math.max(heightPx,18)}px;background:${roomColor};color:white">
           <button class="delete-btn" onclick="deleteEvent('${ev.id}',event)">×</button>
-          <div class="event-title">${activeRoom.name}</div>
+          <div class="event-title">${displayName}</div>
           <div class="event-time">${startStr} – ${endStr}</div>
         </div>`;
       });
