@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heizkalender — Sperrtage</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, sans-serif; background: #f8f9fa; color: #202124; }
+.header { background: white; padding: 12px 20px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #dadce0; }
+.header a { color: #1a73e8; text-decoration: none; font-size: 13px; }
+.header a:hover { text-decoration: underline; }
+.header h1 { font-size: 18px; font-weight: 500; color: #3c4043; }
+.badge { background: #fce8e6; color: #d93025; border-radius: 12px; padding: 3px 10px; font-size: 12px; font-weight: 500; }
+.main { max-width: 600px; margin: 32px auto; padding: 0 16px; }
+.card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; margin-bottom: 24px; }
+.card h2 { font-size: 15px; font-weight: 600; color: #3c4043; margin-bottom: 16px; }
+.info { font-size: 13px; color: #5f6368; margin-bottom: 16px; line-height: 1.5; background: #fef9e7; border-left: 3px solid #f6bf26; padding: 10px 12px; border-radius: 0 4px 4px 0; }
+.add-row { display: flex; gap: 8px; }
+.add-row input { flex: 1; border: 1px solid #dadce0; border-radius: 4px; padding: 8px 12px; font-size: 14px; outline: none; }
+.add-row input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.15); }
+.btn { background: #d93025; color: white; border: none; padding: 8px 18px; border-radius: 4px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+.btn:hover { background: #b31412; }
+.btn-add { background: #1a73e8; }
+.btn-add:hover { background: #1557b0; }
+.list { margin-top: 16px; }
+.list-empty { color: #70757a; font-size: 13px; text-align: center; padding: 24px; }
+.sperrtag-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f3f4; }
+.sperrtag-item:last-child { border-bottom: none; }
+.sperrtag-date { font-size: 15px; font-weight: 500; color: #202124; }
+.sperrtag-weekday { font-size: 12px; color: #70757a; margin-top: 2px; }
+.delete-btn { background: none; border: 1px solid #dadce0; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 12px; color: #d93025; }
+.delete-btn:hover { background: #fce8e6; border-color: #d93025; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <a href="/">← Zurück zum Kalender</a>
+  <h1>Sperrtage</h1>
+  <span class="badge" id="sperrtageCount">0 Tage</span>
+</div>
+
+<div class="main">
+  <div class="card">
+    <h2>Was sind Sperrtage?</h2>
+    <div class="info">
+      An Sperrtagen wird in keinem Raum geheizt — unabhängig davon was im Kalender steht.
+      Die CCU bekommt die Termine für gesperrte Tage einfach nicht ausgespielt.
+      Ideal für Urlaub, Feiertage oder Betriebsferien.
+    </div>
+    <h2>Sperrtag hinzufugen</h2>
+    <div class="add-row">
+      <input type="date" id="newDate">
+      <button class="btn btn-add" onclick="addSperrtag()">Sperren</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Aktive Sperrtage</h2>
+    <div class="list" id="sperrtageList">
+      <div class="list-empty">Keine Sperrtage eingetragen</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+
+let sperrtage = [];
+
+async function load() {
+  const res = await fetch('/sperrtage');
+  sperrtage = await res.json();
+  render();
+}
+
+function render() {
+  const list = document.getElementById('sperrtageList');
+  const count = document.getElementById('sperrtageCount');
+  count.textContent = sperrtage.length + ' Tag' + (sperrtage.length !== 1 ? 'e' : '');
+
+  if (sperrtage.length === 0) {
+    list.innerHTML = '<div class="list-empty">Keine Sperrtage eingetragen</div>';
+    return;
+  }
+
+  list.innerHTML = sperrtage.map(datum => {
+    const d = new Date(datum + 'T12:00:00');
+    const weekday = WEEKDAYS[d.getDay()];
+    const formatted = d.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
+    return `<div class="sperrtag-item">
+      <div>
+        <div class="sperrtag-date">${formatted}</div>
+        <div class="sperrtag-weekday">${weekday}</div>
+      </div>
+      <button class="delete-btn" onclick="deleteSperrtag('${datum}')">Freigeben</button>
+    </div>`;
+  }).join('');
+}
+
+async function addSperrtag() {
+  const datum = document.getElementById('newDate').value;
+  if (!datum) { alert('Bitte ein Datum auswahlen'); return; }
+  await fetch('/sperrtage', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ datum })
+  });
+  document.getElementById('newDate').value = '';
+  await load();
+}
+
+async function deleteSperrtag(datum) {
+  await fetch('/sperrtage/' + datum, { method: 'DELETE' });
+  await load();
+}
+
+// Standardmäßig heutiges Datum vorausfüllen
+document.getElementById('newDate').value = new Date().toISOString().split('T')[0];
+
+load();
+</script>
+</body>
+</html>
