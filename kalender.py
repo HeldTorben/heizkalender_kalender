@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 from icalendar import Calendar, Event
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import uuid
 import os
 import json
@@ -69,7 +70,7 @@ def get_events():
         if component.name == "VEVENT":
             events.append({
                 "id": str(component.get("uid")),
-                "title": str(component.get("summary")),
+                "title": str(component.get("summary")).lstrip('#'),
                 "start": component.get("dtstart").dt.isoformat(),
                 "end": component.get("dtend").dt.isoformat(),
                 "description": str(component.get("description", ""))
@@ -82,9 +83,9 @@ def add_event():
     cal = load_cal()
     event = Event()
     event.add("uid", str(uuid.uuid4()))
-    event.add("summary", data["title"])
-    event.add("dtstart", datetime.fromisoformat(data["start"]))
-    event.add("dtend", datetime.fromisoformat(data["end"]))
+    event.add("summary", '#' + data["title"])
+    event.add("dtstart", datetime.fromisoformat(data["start"]).replace(tzinfo=ZoneInfo("Europe/Berlin")))
+    event.add("dtend", datetime.fromisoformat(data["end"]).replace(tzinfo=ZoneInfo("Europe/Berlin")))
     event.add("description", data.get("description", ""))
     cal.add_component(event)
     save_cal(cal)
