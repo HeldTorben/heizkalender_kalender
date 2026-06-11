@@ -297,7 +297,7 @@ async function saveEvent() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      title: '#' + activeRoom.resource,
+      title: activeRoom.resource,
       start: date + 'T' + start + ':00',
       end: date + 'T' + end + ':00',
       description: desc
@@ -328,7 +328,7 @@ function renderCalendar() {
   const days = ['Mo','Di','Mi','Do','Fr','Sa','So'];
   document.getElementById('weekLabel').textContent = formatMonth(currentWeekStart);
 
-  const roomResource = activeRoom ? '#' + activeRoom.resource : null;
+  const roomResource = activeRoom ? activeRoom.resource : null;
   const roomIdx = activeRoom ? rooms.findIndex(r => r.resource === activeRoom.resource) : 0;
   const roomColor = COLORS[Math.max(roomIdx,0) % COLORS.length];
 
