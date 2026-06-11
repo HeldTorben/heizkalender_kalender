@@ -1,6 +1,6 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, Response
 from icalendar import Calendar, Event
-from datetime import datetime
+from datetime import datetime, date
 from zoneinfo import ZoneInfo
 import uuid
 import os
@@ -9,6 +9,7 @@ import json
 app = Flask(__name__)
 ICS_PATH = "/var/www/kalender/heizung.ics"
 ROOMS_PATH = "/var/www/kalender/rooms.json"
+SPERR_PATH = "/var/www/kalender/sperrtage.json"
 
 # ===== Kalender =====
 def load_cal():
@@ -36,10 +37,25 @@ def save_rooms(rooms):
     with open(ROOMS_PATH, "w") as f:
         json.dump(rooms, f)
 
+# ===== Sperrtage =====
+def load_sperrtage():
+    if os.path.exists(SPERR_PATH):
+        with open(SPERR_PATH, "r") as f:
+            return json.load(f)
+    return []
+
+def save_sperrtage(sperrtage):
+    with open(SPERR_PATH, "w") as f:
+        json.dump(sperrtage, f)
+
 # ===== Routes =====
 @app.route("/")
 def index():
     return send_from_directory("/var/www/kalender", "index.html")
+
+@app.route("/sperrtage-ui")
+def sperrtage_ui():
+    return send_from_directory("/var/www/kalender", "sperrtage.html")
 
 @app.route("/rooms", methods=["GET"])
 def get_rooms():
@@ -102,6 +118,50 @@ def delete_event(uid):
             new_cal.add_component(component)
     save_cal(new_cal)
     return jsonify({"status": "ok"})
+
+@app.route("/sperrtage", methods=["GET"])
+def get_sperrtage():
+    return jsonify(load_sperrtage())
+
+@app.route("/sperrtage", methods=["POST"])
+def add_sperrtag():
+    data = request.json
+    sperrtage = load_sperrtage()
+    datum = data.get("datum")
+    if not datum:
+        return jsonify({"error": "Datum fehlt"}), 400
+    if datum not in sperrtage:
+        sperrtage.append(datum)
+        sperrtage.sort()
+        save_sperrtage(sperrtage)
+    return jsonify({"status": "ok"})
+
+@app.route("/sperrtage/<datum>", methods=["DELETE"])
+def delete_sperrtag(datum):
+    sperrtage = load_sperrtage()
+    sperrtage = [s for s in sperrtage if s != datum]
+    save_sperrtage(sperrtage)
+    return jsonify({"status": "ok"})
+
+@app.route("/kalender/heizung.ics")
+def serve_ics():
+    # Gefilterte ICS ausliefern — Termine an Sperrtagen werden entfernt
+    sperrtage = load_sperrtage()
+    cal = load_cal()
+    filtered_cal = Calendar()
+    for key, value in cal.items():
+        filtered_cal.add(key, value)
+    for component in cal.walk():
+        if component.name == "VEVENT":
+            dt = component.get("dtstart").dt
+            if hasattr(dt, 'date'):
+                tag = dt.date().isoformat()
+            else:
+                tag = dt.isoformat()
+            if tag not in sperrtage:
+                filtered_cal.add_component(component)
+    content = filtered_cal.to_ical().replace(b'\r\n', b'\n')
+    return Response(content, mimetype="text/calendar")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
